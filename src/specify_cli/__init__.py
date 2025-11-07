@@ -589,16 +589,28 @@ def download_template_from_github(ai_assistant: str, download_dir: Path, *, scri
         raise typer.Exit(1)
 
     assets = release_data.get("assets", [])
-    pattern = f"spec-kit-template-{ai_assistant}-{script_type}"
+    # Try exact pattern first: spec-kit-template-{ai}-{script}-v*.zip
+    pattern_with_script = f"spec-kit-template-{ai_assistant}-{script_type}"
     matching_assets = [
         asset for asset in assets
-        if pattern in asset["name"] and asset["name"].endswith(".zip")
+        if pattern_with_script in asset["name"] and asset["name"].endswith(".zip")
     ]
+    
+    # Fallback to pattern without script type: spec-kit-template-{ai}-v*.zip
+    if not matching_assets:
+        pattern_without_script = f"spec-kit-template-{ai_assistant}-v"
+        matching_assets = [
+            asset for asset in assets
+            if pattern_without_script in asset["name"] and asset["name"].endswith(".zip")
+        ]
+        used_pattern = pattern_without_script
+    else:
+        used_pattern = pattern_with_script
 
     asset = matching_assets[0] if matching_assets else None
 
     if asset is None:
-        console.print(f"[red]No matching release asset found[/red] for [bold]{ai_assistant}[/bold] (expected pattern: [bold]{pattern}[/bold])")
+        console.print(f"[red]No matching release asset found[/red] for [bold]{ai_assistant}[/bold] (tried patterns: [bold]{pattern_with_script}[/bold], [bold]{pattern_without_script}[/bold])")
         asset_names = [a.get('name', '?') for a in assets]
         console.print(Panel("\n".join(asset_names) or "(no assets)", title="Available Assets", border_style="yellow"))
         raise typer.Exit(1)
